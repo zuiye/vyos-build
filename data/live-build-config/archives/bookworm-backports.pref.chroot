@@ -2,6 +2,18 @@ Package: iproute2
 Pin: release n=bookworm-backports
 Pin-Priority: 600
 
+Package: libsqlite3-0
+Pin: release n=bookworm-backports
+Pin-Priority: 600
+
+Package: sqlite3
+Pin: release n=bookworm-backports
+Pin-Priority: 600
+
+Package: zabbix-proxy-sqlite3
+Pin: release n=bookworm-backports
+Pin-Priority: 600
+
 Package: *
 Pin: release n=bookworm-backports
 Pin-Priority: -100
