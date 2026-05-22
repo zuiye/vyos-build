@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2024 VyOS maintainers and contributors
+# Copyright (C) 2018-2025 VyOS maintainers and contributors
 #
 # This program is free software; you can redistribute it and/or modify
 # in order to easy exprort images built to "external" world
@@ -18,7 +18,7 @@
 
 # This Dockerfile is installable on both x86, x86-64, armhf and arm64 systems
 ARG ARCH=
-FROM ${ARCH}debian:bookworm
+FROM ${ARCH}debian:bookworm-slim
 
 RUN grep "VERSION_ID" /etc/os-release || (echo 'VERSION_ID="12"' >> /etc/os-release)
 
@@ -53,6 +53,8 @@ LABEL authors="VyOS Maintainers <maintainers@vyos.io>" \
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN /bin/echo -e 'APT::Install-Recommends "0";\nAPT::Install-Suggests "0";' > /etc/apt/apt.conf.d/01norecommends
+# Clean cache after each apt-get install command so that it is not stored in the image
+RUN /bin/echo -e 'DPkg::Post-Invoke {"/bin/rm -f /var/cache/apt/archives/*.deb /var/lib/apt/lists/* || true";};' > /etc/apt/apt.conf.d/clean
 
 RUN apt-get update && apt-get install -y \
       dialog \
@@ -88,7 +90,9 @@ RUN apt-get update && apt-get install -y \
       po4a \
       openssh-client \
       jq \
-      socat
+      socat \
+      python-is-python3 \
+      apt-transport-https
 
 # Packages needed for vyos-build
 RUN apt-get update && apt-get install -y \
@@ -109,7 +113,8 @@ RUN apt-get update && apt-get install -y \
       live-build \
       gdisk \
       sbsigntool \
-      dosfstools
+      dosfstools \
+      kpartx
 
 # Packages for TPM test
 RUN apt-get update && apt-get install -y swtpm
@@ -123,9 +128,10 @@ RUN if dpkg-architecture -ii386 || dpkg-architecture -iamd64; then \
 
 # Building libvyosconf requires a full configured OPAM/OCaml setup
 RUN apt-get update && apt-get install -y \
+      quilt \
       debhelper \
       libffi-dev \
-      libpcre3-dev \
+      libpcre2-dev \
       unzip
 
 # Update certificate store to not crash ocaml package install
@@ -135,37 +141,27 @@ RUN dpkg-reconfigure ca-certificates; \
       echo "cacert=/etc/ssl/certs/ca-certificates.crt" >> ~/.curlrc; \
     fi
 
-# Installing OCAML needed to compile libvyosconfig
+# Installing OCaml needed to compile libvyosconfig
 RUN curl https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh \
       --output /tmp/opam_install.sh --retry 10 --retry-delay 5 && \
     sed -i 's/read_tty BINDIR/BINDIR=""/' /tmp/opam_install.sh && sh /tmp/opam_install.sh && \
-    opam init --root=/opt/opam --comp=${OCAML_VERSION} --disable-sandboxing --no-setup
-
-RUN eval $(opam env --root=/opt/opam --set-root) && \
-    opam pin add pcre https://github.com/mmottl/pcre-ocaml.git#0c4ca03a -y
+    opam init --root=/opt/opam --comp=${OCAML_VERSION} --disable-sandboxing --no-setup \
+    && rm /tmp/opam_install.sh
 
 RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
       re \
+      pcre2 \
       num \
       ctypes \
       ctypes-foreign \
       ctypes-build \
       containers \
       fileutils \
-      xml-light
-
-# Packages needed for libvyosconfig
-RUN apt-get update && apt-get install -y \
-      quilt \
-      libpcre3-dev \
-      libffi-dev
-
-# Build libvyosconfig
-RUN eval $(opam env --root=/opt/opam --set-root) && \
-    git clone https://github.com/vyos/libvyosconfig.git /tmp/libvyosconfig && \
-    cd /tmp/libvyosconfig && git checkout 677d1e2bf8109b9fd4da60e20376f992b747e384 && \
-    dpkg-buildpackage -uc -us -tc -b && \
-    dpkg -i /tmp/libvyosconfig0_*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
+      xml-light \
+      mustache \
+      yojson \
+      fmt \
+      logs
 
 # Packages needed for open-vmdk
 RUN apt-get update && apt-get install -y \
@@ -174,7 +170,8 @@ RUN apt-get update && apt-get install -y \
 # Install open-vmdk
 RUN wget -O /tmp/open-vmdk-master.zip https://github.com/vmware/open-vmdk/archive/master.zip && \
     unzip -d /tmp/ /tmp/open-vmdk-master.zip && \
-    cd /tmp/open-vmdk-master/ && make && make install
+    cd /tmp/open-vmdk-master/ && make && make install && \
+    cd /tmp && rm -rf /tmp/open-vmdk-master/ && rm /tmp/open-vmdk-master.zip
 
 # Packages need for build live-build
 RUN apt-get update && apt-get install -y \
@@ -187,7 +184,9 @@ RUN git clone https://salsa.debian.org/live-team/live-build.git /tmp/live-build 
     patch -p1 < /tmp/0001-save-package-info.patch && \
     dch -n "Applying fix for save package info" && \
     dpkg-buildpackage -us -uc && \
-    dpkg -i ../live-build*.deb
+    dpkg -i ../live-build*.deb && \
+    rm -rf /tmp/live-build
+
 #
 # live-build: building in docker fails with mounting /proc | /sys
 #
@@ -202,54 +201,35 @@ RUN wget https://salsa.debian.org/klausenbusk-guest/debootstrap/commit/a9a603b17
     patch -p1 < /tmp/a9a603b17cadbf52cb98cde0843dc9f23a08b0da.patch && \
     dch -n "Applying fix for docker image compile" && \
     dpkg-buildpackage -us -uc && \
-    sudo dpkg -i ../debootstrap*.deb
+    sudo dpkg -i ../debootstrap*.deb \
+    && rm /tmp/a9a603b17cadbf52cb98cde0843dc9f23a08b0da.patch \
+    && rm -rf /tmp/debootstrap
 
-# Packages needed for Linux Kernel
-# cmake required by accel-ppp
-RUN apt-get update && apt-get install -y \
-      cmake \
-      gnupg2 \
-      rsync \
-      libelf-dev \
-      libncurses5-dev \
-      flex \
-      bison \
-      bc \
-      kmod \
-      cpio \
-      python-is-python3 \
-      dwarves \
-      nasm \
-      rdfind
-
-# Packages needed for Intel QAT out-of-tree drivers
 # FPM is used when generation Debian pckages for e.g. Intel QAT drivers
-RUN apt-get update && apt-get install -y \
-      pciutils \
-      yasm \
-      ruby \
-      libudev-dev \
-      ruby-dev \
-      rubygems \
-      build-essential
 RUN gem install --no-document fpm
 
+# Add vyos package repo
+COPY vyos-dev.list /etc/apt/sources.list.d/vyos-dev.list
+COPY vyos-dev.key /usr/share/keyrings/vyos-dev-archive-keyring.asc
+
 # Packages needed for vyos-1x
-RUN pip install --break-system-packages \
+RUN pip --no-cache --no-cache-dir install --break-system-packages \
       git+https://github.com/aristanetworks/j2lint.git@341b5d5db86 \
       pyhumps==3.8.0; \
     apt-get update && apt-get install -y \
+      build-essential \
       dh-python \
       fakeroot \
       iproute2 \
       libzmq3-dev \
       procps \
+      protobuf-compiler \
       python3 \
       python3-setuptools \
       python3-inotify \
       python3-xmltodict \
       python3-lxml \
-      python3-nose \
+      python3-nose2 \
       python3-netifaces \
       python3-jinja2 \
       python3-jmespath \
@@ -261,8 +241,18 @@ RUN pip install --break-system-packages \
       python3-netaddr \
       python3-paramiko \
       python3-passlib \
+      python3-protobuf \
       python3-tabulate \
       python3-zmq \
+      python3-vici \
+      python3-fastapi \
+      python3-pyudev \
+      python3-systemd \
+      python3-certbot-nginx \
+      python3-pam \
+      python3-dbus \
+      python3-pyroute2 \
+      python3-voluptuous \
       pylint \
       quilt \
       whois \
@@ -276,7 +266,7 @@ RUN GO_VERSION_INSTALL="1.23.2" ; \
 RUN echo "export PATH=/opt/go/bin:$PATH" >> /etc/bash.bashrc
 
 # Packages needed for Qemu test-suite
-# This is for now only supported on i386 and amd64 platforms
+# Packages for i386 and amd64 platforms
 RUN if dpkg-architecture -ii386 || dpkg-architecture -iamd64; then \
       apt-get update && apt-get install -y \
         python3-pexpect \
@@ -286,11 +276,19 @@ RUN if dpkg-architecture -ii386 || dpkg-architecture -iamd64; then \
         qemu-kvm; \
     fi
 
+# Packages for arm64 platform
+RUN if dpkg-architecture -iarm64; then \
+      apt-get update && apt-get install -y \
+        python3-pexpect \
+        ipxe-qemu \
+        qemu-system-aarch64 \
+        qemu-efi-aarch64; \
+    fi
+
 # Packages needed for building vmware and GCE images
 # This is only supported on i386 and amd64 platforms
 RUN if dpkg-architecture -ii386 || dpkg-architecture -iamd64; then \
      apt-get update && apt-get install -y \
-      kpartx \
       parted \
       udev \
       grub-pc \
@@ -314,7 +312,7 @@ RUN apt-get update && apt-get install -y \
       python3-pytest-cov \
       cloud-utils
 
-# Install utillities for building grub and u-boot images
+# Install utilities for building grub and u-boot images
 RUN if dpkg-architecture -iarm64; then \
     apt-get update && apt-get install -y \
       dosfstools \
@@ -327,17 +325,17 @@ RUN if dpkg-architecture -iarm64; then \
       grub-efi-arm; \
     fi
 
-# Packages needed for openvpn-otp
-RUN apt-get update && apt-get install -y \
-      debhelper \
-      libssl-dev \
-      openvpn
-
 # Packages needed for OWAMP/TWAMP (service sla)
 RUN git clone -b 4.4.6 https://github.com/perfsonar/i2util.git /tmp/i2util && \
       cd /tmp/i2util && \
       dpkg-buildpackage -uc -us -tc -b && \
       dpkg -i /tmp/*i2util*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
+
+# Package needed for building Kea
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
+      > /etc/apt/sources.list.d/bookworm-backports.list \
+      && apt-get update \
+      && apt install -y -t bookworm-backports meson
 
 # Creating image for embedded systems needs this utilities to prepare a image file
 RUN apt-get update && apt-get install -y \
@@ -345,46 +343,32 @@ RUN apt-get update && apt-get install -y \
       udev \
       zip
 
-# Packages needed for Accel-PPP
-# XXX: please note that this must be installed after nftable dependencies - otherwise
-# APT will remove liblua5.3-dev which breaks the Accel-PPP build
-# With bookworm, updated to libssl3 (Note: https://github.com/accel-ppp/accel-ppp/issues/68)
-RUN apt-get update && apt-get install -y \
-      liblua5.3-dev \
-      libssl3 \
-      libssl-dev \
-      libpcre3-dev
-
 # debmake: a native Debian tool for preparing sources for packaging
 RUN apt-get update && apt-get install -y \
       debmake \
       python3-debian
-
-# Packages for jool
-RUN apt-get update && apt-get install -y \
-      libnl-genl-3-dev \
-      libxtables-dev
-
-# Packages needed for nftables
-RUN apt-get update && apt-get install -y \
-      asciidoc-base
 
 # Allow password-less 'sudo' for all users in group 'sudo'
 RUN sed "s/^%sudo.*/%sudo\tALL=(ALL) NOPASSWD:ALL/g" -i /etc/sudoers && \
     echo "vyos_bld\tALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     chmod a+s /usr/sbin/useradd /usr/sbin/groupadd
 
-# Ensure sure all users have access to our OCAM and Go installation
-RUN echo "$(opam env --root=/opt/opam --set-root)" >> /etc/skel/.bashrc && \
-    echo "export PATH=/opt/go/bin:\$PATH" >> /etc/skel/.bashrc
+# Ensure all users have access to Go
+RUN echo "export PATH=/opt/go/bin:\$PATH" >> /etc/skel/.bashrc
 
-# Rise upper limit for UID when working in an Active Direcotry integrated
+# Raise upper limit for UID when working in an Active Directory integrated
 # environment. This solves the warning: vyos_bld's uid 1632000007 outside of the
 # UID_MIN 1000 and UID_MAX 60000 range.
 RUN sed -i 's/UID_MAX\t\t\t60000/UID_MAX\t\t\t2000000000/g' /etc/login.defs
 
 # Cleanup
 RUN rm -rf /tmp/*
+
+# Remove cleanup script so that in-container apt-get install uses cache
+RUN rm /etc/apt/apt.conf.d/clean
+
+# Add cache once as it is needed by some builds in GitHub Actions
+RUN apt-get update
 
 # Disable mouse in vim
 RUN printf "set mouse=\nset ttymouse=\n" > /etc/vim/vimrc.local

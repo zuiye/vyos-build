@@ -12,29 +12,21 @@ build_cmd = "build_kernel"
 
 [[packages]]
 name = "linux-firmware"
-commit_id = "20240610"
+commit_id = "20260410"
 scm_url = "https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
 build_cmd = "build_linux_firmware"
 
 [[packages]]
-name = "accel-ppp"
-commit_id = "1.13.0"
-scm_url = "https://github.com/accel-ppp/accel-ppp.git"
-build_cmd = "build_accel_ppp"
-
-
-[[packages]]
-name = "ovpn-dco"
-commit_id = "v0.2.20231117"
-scm_url = "https://github.com/OpenVPN/ovpn-dco"
-build_cmd = "build_openvpn_dco"
+name = "accel-ppp-ng"
+commit_id = "64e351d"
+scm_url = "https://github.com/accel-ppp/accel-ppp-ng.git"
+build_cmd = "build_accel_ppp_ng"
 
 [[packages]]
 name = "nat-rtsp"
-commit_id = "475af0a"
+commit_id = "5aeee02"
 scm_url = "https://github.com/maru-sama/rtsp-linux.git"
 build_cmd = "build_nat_rtsp"
-
 
 [[packages]]
 name = "qat"
@@ -44,21 +36,39 @@ build_cmd = "build_intel_qat"
 
 [[packages]]
 name = "igb"
-commit_id = "v5.18.7"
+commit_id = "v5.19.10"
 scm_url = "https://github.com/intel/ethernet-linux-igb"
-build_cmd = "build_intel_igb"
+build_cmd = "build_intel_nic"
 
 [[packages]]
 name = "ixgbe"
-commit_id = "v6.0.5"
+commit_id = "v6.3.6"
 scm_url = "https://github.com/intel/ethernet-linux-ixgbe"
-build_cmd = "build_intel_ixgbe"
+build_cmd = "build_intel_nic"
 
 [[packages]]
 name = "ixgbevf"
-commit_id = "v5.0.2"
+commit_id = "v5.2.2"
 scm_url = "http://github.com/intel/ethernet-linux-ixgbevf"
-build_cmd = "build_intel_ixgbevf"
+build_cmd = "build_intel_nic"
+
+[[packages]]
+name = "i40e"
+commit_id = "v2.28.16"
+scm_url = "http://github.com/intel/ethernet-linux-i40e"
+build_cmd = "build_intel_nic"
+
+[[packages]]
+name = "ice"
+commit_id = "v2.5.4"
+scm_url = "http://github.com/intel/ethernet-linux-ice"
+build_cmd = "build_intel_nic"
+
+[[packages]]
+name = "iavf"
+commit_id = "v4.13.20"
+scm_url = "http://github.com/intel/ethernet-linux-iavf"
+build_cmd = "build_intel_nic"
 
 [[packages]]
 name = "jool"
@@ -73,7 +83,66 @@ scm_url = ""
 build_cmd = "build_mellanox_ofed"
 
 [[packages]]
+name = "realtek-r8126"
+commit_id = ""
+scm_url = ""
+build_cmd = "build_realtek_r8126"
+
+[[packages]]
 name = "realtek-r8152"
 commit_id = ""
 scm_url = ""
 build_cmd = "build_realtek_r8152"
+
+[[packages]]
+name = "ipt-netflow"
+commit_id = "6135551"
+scm_url = "https://github.com/nuclearcat/ipt-netflow"
+build_cmd = "build_ipt_netflow"
+
+[dependencies]
+packages = [
+    "cmake",
+    "gnupg2",
+    "rsync",
+    "libelf-dev",
+    "libncurses5-dev",
+    "flex",
+    "bison",
+    "bc",
+    "kmod",
+    "cpio",
+    "ccache",
+    "dwarves",
+    "nasm",
+    "rdfind",
+    "pciutils",
+    "yasm",
+    "libudev-dev",
+    "ruby",
+    "ruby-dev",
+    "rubygems",
+    "build-essential",
+    "binutils-dev",
+    "libdw-dev",
+    "libunwind-dev",
+    "libdebuginfod-dev",
+    "systemtap-sdt-dev",
+    "libslang2-dev",
+    "python-dev-is-python3",
+    "libzstd-dev",
+    "libcap-dev",
+    "libnuma-dev",
+    "libbabeltrace-ctf-dev",
+    "libpfm4-dev",
+    "libtraceevent-dev",
+    "liblua5.3-dev",
+    "libssl3",
+    "libssl-dev",
+    "libsnmp-dev",
+    "snmpd",
+    "libpcre3-dev",
+    "libnl-genl-3-dev",
+    "libxtables-dev",
+    "asciidoc-base"
+]

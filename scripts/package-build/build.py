@@ -17,7 +17,8 @@
 
 import glob
 import shutil
-import toml
+import sys
+import tomli
 import os
 
 from argparse import ArgumentParser
@@ -32,7 +33,6 @@ def ensure_dependencies(dependencies: list) -> None:
         return
 
     print("I: Ensure Debian build dependencies are met")
-    run(['sudo', 'apt-get', 'update'], check=True)
     run(['sudo', 'apt-get', 'install', '-y'] + dependencies, check=True)
 
 
@@ -91,7 +91,11 @@ def build_package(package: list, patch_dir: Path) -> None:
 
         # Check out the specific commit
         run(['git', 'checkout', package['commit_id']], cwd=repo_dir, check=True)
+    except CalledProcessError as e:
+        print(f"Failed to clone or checkout for package '{repo_name}': {e}")
+        sys.exit(1)
 
+    try:
         # The `pre_build_hook` is an optional configuration defined in `package.toml`.
         # It executes after the repository is checked out and before the build process begins.
         # This hook allows you to perform preparatory tasks, such as creating directories,
@@ -135,7 +139,7 @@ def build_package(package: list, patch_dir: Path) -> None:
         # Sanitize the commit ID and build a tarball for the package
         commit_id_sanitized = package['commit_id'].replace('/', '_')
         tarball_name = f"{repo_name}_{commit_id_sanitized}.tar.gz"
-        run(['tar', '-czf', tarball_name, '-C', str(repo_dir.parent), repo_name], check=True)
+        run(['tar', '--exclude=.git', '--exclude=.github', '-czf', tarball_name, '-C', str(repo_dir.parent), repo_name], check=True)
         print(f"I: Tarball created: {tarball_name}")
 
         # Prepare the package if required
@@ -152,7 +156,7 @@ def build_package(package: list, patch_dir: Path) -> None:
 
         # Build the package, check if we have build_cmd in the package.toml
         try:
-            build_cmd = package.get('build_cmd', 'dpkg-buildpackage -uc -us -tc -F')
+            build_cmd = package.get('build_cmd', 'dpkg-buildpackage -uc -us -tc -F --source-option=--tar-ignore=.git --source-option=--tar-ignore=.github')
             run(build_cmd, cwd=repo_dir, check=True, shell=True)
         except CalledProcessError as e:
             print(e)
@@ -202,11 +206,14 @@ if __name__ == '__main__':
     args = arg_parser.parse_args()
 
     # Load package configuration
-    with open(args.config, 'r') as file:
-        config = toml.load(file)
+    with open(args.config, 'rb') as file:
+        config = tomli.load(file)
 
     packages = config['packages']
     patch_dir = Path(args.patch_dir)
+
+    # Update APT mirror list before the build
+    run(['sudo', 'apt-get', 'update'], check=True)
 
     # Load global dependencies
     global_dependencies = config.get('dependencies', {}).get('packages', [])

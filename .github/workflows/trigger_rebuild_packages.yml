@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref_name }}
 
@@ -31,6 +31,8 @@ jobs:
               - 'scripts/package-build/aws-gwlbtun/**'
             blackbox_exporter:
               - 'scripts/package-build/blackbox_exporter/**'
+            bash-completion:
+              - 'scripts/package-build/bash-completion/**'
             ddclient:
               - 'scripts/package-build/ddclient/**'
             dropbear:
@@ -47,10 +49,12 @@ jobs:
               - 'scripts/package-build/hsflowd/**'
             isc-dhcp:
               - 'scripts/package-build/isc-dhcp/**'
-            kea:
-              - 'scripts/package-build/kea/**'
+            isc-kea:
+              - 'scripts/package-build/isc-kea/**'
             keepalived:
               - 'scripts/package-build/keepalived/**'
+            libnss-mapuser:
+              - 'scripts/package-build/libnss-mapuser/**'
             libpam-radius-auth:
               - 'scripts/package-build/libpam-radius-auth/**'
             linux-kernel:
@@ -70,20 +74,24 @@ jobs:
               - 'scripts/package-build/owamp/**'
             pam_tacplus:
               - 'scripts/package-build/pam_tacplus/**'
-            pmacct:
-              - 'scripts/package-build/pmacct/**'
             podman:
               - 'scripts/package-build/podman/**'
             pyhumps:
               - 'scripts/package-build/pyhumps/**'
             radvd:
               - 'scripts/package-build/radvd/**'
+            salt:
+              - 'scripts/package-build/salt/**'
             strongswan:
               - 'scripts/package-build/strongswan/**'
             tacacs:
               - 'scripts/package-build/tacacs/**'
             telegraf:
               - 'scripts/package-build/telegraf/**'
+            udp-broadcast-relay:
+              - 'scripts/package-build/udp-broadcast-relay/**'
+            unionfs-fuse:
+              - 'scripts/package-build/unionfs-fuse/**'
             vpp:
               - 'scripts/package-build/vpp/**'
             waagent:
@@ -92,6 +100,8 @@ jobs:
               - 'scripts/package-build/wide-dhcpv6/**'
             xen-guest-agent:
               - 'scripts/package-build/xen-guest-agent/**'
+            zerotier-one:
+              - 'scripts/package-build/zerotier-one/**'
 
       - name: Trigger builds for changed packages
         run: |
@@ -105,7 +115,7 @@ jobs:
               -H "Authorization: Bearer ${{ secrets.PAT }}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               https://api.github.com/repos/${{ secrets.REMOTE_OWNER }}/${{ secrets.REMOTE_REUSE_REPO }}/actions/workflows/build-package.yml/dispatches \
-              -d '{"ref": "${{ env.REF }}", "inputs":{"package_name":"'"$PACKAGE_NAME"'", "gpg_key_id": "${{ secrets.GPG_KEY_ID }}", "package_branch": "${{ github.ref_name }}"}}'
+              -d '{"ref": "${{ env.REF }}", "inputs":{"package_name":"'"$PACKAGE_NAME"'", "gpg_key_id": "${{ secrets.GPG_KEY_ID }}", "package_branch": "${{ github.ref_name }}", "pat": "${{ secrets.PAT }}"}}'
           }
 
           # Trigger builds based on detected changes
@@ -119,6 +129,14 @@ jobs:
 
           if [ "${{ steps.changes.outputs.aws-gwlbtun }}" == "true" ]; then
             trigger_build "aws-gwlbtun"
+          fi
+
+          if [ "${{ steps.changes.outputs.bash-completion }}" == "true" ]; then
+            trigger_build "bash-completion"
+          fi
+
+          if [ "${{ steps.changes.outputs.blackbox_exporter }}" == "true" ]; then
+            trigger_build "blackbox_exporter"
           fi
 
           if [ "${{ steps.changes.outputs.ddclient }}" == "true" ]; then
@@ -153,12 +171,16 @@ jobs:
             trigger_build "isc-dhcp"
           fi
 
-          if [ "${{ steps.changes.outputs.kea }}" == "true" ]; then
-            trigger_build "kea"
+          if [ "${{ steps.changes.outputs.isc-kea }}" == "true" ]; then
+            trigger_build "isc-kea"
           fi
 
           if [ "${{ steps.changes.outputs.keepalived }}" == "true" ]; then
             trigger_build "keepalived"
+          fi
+
+          if [ "${{ steps.changes.outputs.libnss-mapuser }}" == "true" ]; then
+            trigger_build "libnss-mapuser"
           fi
 
           if [ "${{ steps.changes.outputs.libpam-radius-auth }}" == "true" ]; then
@@ -197,10 +219,6 @@ jobs:
             trigger_build "pam_tacplus"
           fi
 
-          if [ "${{ steps.changes.outputs.pmacct }}" == "true" ]; then
-            trigger_build "pmacct"
-          fi
-
           if [ "${{ steps.changes.outputs.podman }}" == "true" ]; then
             trigger_build "podman"
           fi
@@ -213,6 +231,10 @@ jobs:
             trigger_build "radvd"
           fi
 
+          if [ "${{ steps.changes.outputs.salt }}" == "true" ]; then
+            trigger_build "salt"
+          fi
+
           if [ "${{ steps.changes.outputs.strongswan }}" == "true" ]; then
             trigger_build "strongswan"
           fi
@@ -223,6 +245,14 @@ jobs:
 
           if [ "${{ steps.changes.outputs.telegraf }}" == "true" ]; then
             trigger_build "telegraf"
+          fi
+
+          if [ "${{ steps.changes.outputs.udp-broadcast-relay }}" == "true" ]; then
+            trigger_build "udp-broadcast-relay"
+          fi
+
+          if [ "${{ steps.changes.outputs.unionfs-fuse }}" == "true" ]; then
+            trigger_build "unionfs-fuse"
           fi
 
           if [ "${{ steps.changes.outputs.vpp }}" == "true" ]; then
@@ -239,4 +269,8 @@ jobs:
 
           if [ "${{ steps.changes.outputs.xen-guest-agent }}" == "true" ]; then
             trigger_build "xen-guest-agent"
+          fi
+
+          if [ "${{ steps.changes.outputs.zerotier-one }}" == "true" ]; then
+            trigger_build "zerotier-one"
           fi

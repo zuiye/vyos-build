@@ -25,6 +25,11 @@ import shutil
 import defaults
 import vyos
 
+from vyos.defaults import directories
+from vyos.defaults import activation_hint
+from vyos.defaults import activation_init
+
+
 def check_build_config():
     if not os.path.exists(defaults.BUILD_CONFIG):
         print("Build config file ({file}) does not exist".format(file=defaults.BUILD_CONFIG))
